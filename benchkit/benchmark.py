@@ -1170,7 +1170,7 @@ class Benchmark:
                     output = self.platform.comm.shell(
                         command=command,
                         current_dir=self.bench_src_path,
-                        print_input=False,
+                        print_command=False,
                         print_output=False,
                     )
             except CalledProcessError:
