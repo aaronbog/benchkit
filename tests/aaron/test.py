@@ -30,8 +30,8 @@ class TestShellOut(unittest.TestCase):
     def _addPrivilege(command):
         return "sudo " + command
 
-    # @unittest.mock.patch('sys.stdout', new_callable=io.StringIO)
-    def test_legal_comands(self):
+    @unittest.mock.patch('sys.stdout', new_callable=io.StringIO)
+    def test_legal_comands(self,mock_stdout):
         f = open("demofile2.txt", "a")
         for command in self.legalComands:
             print(benchkitShell.shell_out(command))
