@@ -1,6 +1,0 @@
-[RUN] echo a
-[OUT]
-a
-[RUN] echo a
-[OUT]
-a

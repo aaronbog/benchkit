@@ -2,7 +2,6 @@
 # Copyright (C) 2023 Huawei Technologies Co., Ltd. All rights reserved.
 # SPDX-License-Identifier: MIT
 import unittest
-from unittest.mock import patch
 import io
 import benchkit.shell.shell as benchkitShell
 
@@ -35,7 +34,7 @@ class TestShellOut(unittest.TestCase):
         f = open("demofile2.txt", "a")
         for command in self.legalComands:
             print(benchkitShell.shell_out(command))
-            # f.write(mock_stdout.getvalue())
+            f.write(mock_stdout.getvalue())
 
 
 
