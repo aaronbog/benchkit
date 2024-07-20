@@ -1,4 +1,4 @@
-from command import Command, SingleCommand, CompositeCommand,Operator
+from aaronShell.src.commandAST.Oldcommand import Command, SingleCommand, CompositeCommand,Operator
 from abc import ABC, abstractmethod
 import paramiko
 

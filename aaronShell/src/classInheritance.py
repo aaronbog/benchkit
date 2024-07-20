@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from command import SingleCommand
+from aaronShell.src.commandAST.Oldcommand import SingleCommand
 from aaronShell.src.commandlineInterface.commandlineInterface import CommandlineInterface
 import asyncio, asyncssh, sys
 from abc import ABC, abstractmethod

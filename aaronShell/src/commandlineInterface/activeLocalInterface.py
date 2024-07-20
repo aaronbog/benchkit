@@ -2,7 +2,7 @@ from commandlineInterface import ActiveCommandlineInterface, CommandResult
 from typing import Optional, Type
 from types import TracebackType
 
-from command import SingleCommand, Command, CompositeCommand
+from aaronShell.src.commandAST.Oldcommand import SingleCommand, Command, CompositeCommand
 
 import subprocess
 import sys
@@ -37,6 +37,8 @@ class ActiveLocalInterface(ActiveCommandlineInterface):
                     print_command = None
                     ) -> str:
         raise TODO()
+    
+    
 
     def run_command_struct(self,
                     #command functionality arguments
