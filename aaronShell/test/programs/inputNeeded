@@ -1,0 +1,9 @@
+#!/bin/bash
+ 
+echo "Press any key to continue..."
+ 
+# -s: Do not echo input coming from a terminal
+# -n 1: Read one character
+read -p "Enter a filename: " filename
+ 
+echo "$filename"
