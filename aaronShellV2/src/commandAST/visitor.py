@@ -14,10 +14,8 @@ class Visitor(ABC):
         return node
     def visitRunnableStringNode(self,node:RunnableStringNode) -> Node:
         return node
-    
-    
 
-    def visit[T:Node](self,node:T) -> T: 
+    def visit[T:Node](self,node:T) -> T:
         return eval("self.visit" + type(node).__name__ + "(node)")
 
 class printAST(Visitor):
@@ -52,8 +50,13 @@ class printAST(Visitor):
         self.indent -= 2
         return ret
 
+class printASTTest(Visitor):
+    def visitArgumentStringNode(self,node:ArgumentStringNode) -> Node:
+        print(node.argument)
+        return super().visitArgumentStringNode(node)
+    
 def localtests():
-    v = printAST()
+    v = printASTTest()
     v.visit(command("'ls -R'",["arg0","arg1"]))
 
 if __name__ == "__main__":

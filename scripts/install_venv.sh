@@ -8,13 +8,13 @@ script_dir=$(dirname "$(readlink -f "$0")")
 
 # dependencies: ${pythonex} ${pythonex}-venv ${pythonex}-dev
 
-if python3 -c 'import sys; exit(0 if sys.version_info >= (3, 10) else 1)'
+if python -c 'import sys; exit(0 if sys.version_info >= (3, 10) else 1)'
 then
   # installed python is at least 3.10
-  python_exec=python3
+  python_exec=python
 else
   # for earlier default, we force 3.10
-  python_exec=python3.10
+  python_exec=python3.11
 fi
 
 if ! which ${python_exec} > /dev/null

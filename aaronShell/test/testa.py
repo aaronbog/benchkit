@@ -2,6 +2,7 @@
 # Copyright (C) 2023 Huawei Technologies Co., Ltd. All rights reserved.
 # SPDX-License-Identifier: MIT
 import unittest
+import unittest.mock
 import io
 import benchkit.shell.shell as benchkitShell
 
