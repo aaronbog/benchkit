@@ -7,11 +7,35 @@ import shlex
 import subprocess
 import sys
 from multiprocessing import Process, Queue
+from time import sleep
 from typing import Dict, Iterable, List, Optional
 
+from benchkit.shell.CommunicationLayer.comunication_handle import Output, SubprocessOutput
+from benchkit.shell.CommunicationLayer.hook import ReaderHook
 from benchkit.shell.commandAST import command as makecommand
 from benchkit.shell.commandAST.nodes.commandNodes import CommandNode
 from benchkit.shell.commandAST.visitor import getString
+
+
+def readerhookfunction(comandOutput:Output) -> None:
+        # this is a verry bad way of doing it
+        a = comandOutput.readOut(10)
+        sleep(5)
+        while False:
+            print("[readerhookstart]")
+            print(f"|{a}|")
+            if a =="":
+                break
+            if not a:
+                break
+            a = a.decode('utf-8')
+            print(a,end="")
+            a = comandOutput.readOut(10)
+            print("[readerhookend]")
+        print("hook stops")
+
+
+test = ReaderHook(readerhookfunction,voidStdErr=True)
 
 
 def shell_out_new(
@@ -139,15 +163,16 @@ def shell_out_new(
             str: content of stdout.
         """
         outlines = []
-        outline = try_conventing_bystring_to_readable_characters(std_in.readline())
+        outline = try_conventing_bystring_to_readable_characters(std_in.readErr(10))
 
         while outline:
-            print(outline, end="")
+            print(f"|{outline}|", end="")
             outlines.append(outline)
-            outline = try_conventing_bystring_to_readable_characters(std_in.readline())
+            outline = try_conventing_bystring_to_readable_characters(std_in.readErr(10))
+        print("AAAAAAAAAAAAAAAAAAAAAAAAAAA")
         return outlines
 
-    def flush_thread(std_in, std_err, output_queue):
+    def flush_thread(std_in, output_queue):
         """
         while process is running will log and store all stdout in real time
         Args:
@@ -176,18 +201,20 @@ def shell_out_new(
             shell_process.stdin.write(std_input.encode('utf-8'))
             shell_process.stdin.flush()
 
+        output_struct = SubprocessOutput(shell_process.stdout,shell_process.stderr)
+
         if output_is_log:
             try:
 
                 # logging the process takes two threads since we need to wait for the timeout
                 # while logging stdout in real time, to accomplish this we use multiprocessing
                 # in combination with error catching to interupt the logging if needed
+                test.startHookFunction(output_struct)
                 output_queue:Queue = Queue()
                 logger_process = Process(
                     target=flush_thread,
                     args=(
-                        shell_process.stdout,
-                        shell_process.stderr,
+                        test.getPassthrough(),
                         output_queue,
                     ),
                 )
@@ -195,7 +222,6 @@ def shell_out_new(
                 logger_process.start()
                 retcode = shell_process.wait(timeout=timeout)
                 logger_process.join()
-                print(f"retcode seq {retcode}")
                 output = output_queue.get()
 
             except subprocess.TimeoutExpired as err:

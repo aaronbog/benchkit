@@ -19,13 +19,22 @@ class Output(ABC):
         """reads at most amount_of_bytes from the available stderr"""
         pass
 
-    @abstractmethod
-    def getReaderFdOut(self) -> int:
-        pass
+class SubprocessOutput(Output):
+    def __init__(self,std_out,std_err):
+        self.std_out = std_out
+        self.std_err = std_err
 
-    @abstractmethod
-    def getReaderFdErr(self) -> int:
-        pass
+    def readOut(self, amount_of_bytes):
+        if self.std_out is None:
+            return ""
+        return self.std_out.read(amount_of_bytes)
+
+    def readErr(self, amount_of_bytes):
+        if self.std_err is None:
+            return ""
+        return self.std_err.read(amount_of_bytes)
+
+
 
 
 class WritableOutput(Output):
@@ -34,15 +43,21 @@ class WritableOutput(Output):
     def __init__(self) -> None:
         self.readerOut, self.writerOut = os.pipe()
         self.readerErr, self.writerErr = os.pipe()
+        os.set_inheritable(self.readerErr,True)
+        os.set_inheritable(self.writerOut,True)
+        os.set_inheritable(self.writerErr,True)
+        os.set_inheritable(self.readerOut,True)
 
     def writeOut(self, bytes_to_write: bytes) -> None:
         os.write(self.writerOut, bytes_to_write)
 
     def endWritingOut(self) -> None:
+        print(f"{self.writerOut} this gets called?")
         os.close(self.writerOut)
 
     def readOut(self, amount_of_bytes: int) -> bytes:
-        return os.read(self.readerOut, amount_of_bytes)
+        a = os.read(self.readerOut, amount_of_bytes)
+        return a
 
     def getReaderFdOut(self) -> int:
         return self.readerOut
