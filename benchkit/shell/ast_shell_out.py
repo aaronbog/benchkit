@@ -187,8 +187,8 @@ def shell_out_new(
 
 
     testhook = WriterHook(whook)
-    testhook2 = WriterHook(whook)
-    # testhook2 = ReaderHook(rhook)
+    # testhook2 = WriterHook(whook)
+    testhook2 = ReaderHook(rhook)
 
 
     with subprocess.Popen(

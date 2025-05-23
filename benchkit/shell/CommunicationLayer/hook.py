@@ -72,7 +72,7 @@ class ReaderHook(Hook):
         #if not already ended end the splitof datastream
         if not void_stderr:
             print("?????")
-            splitof.endWritingErr()
+            # splitof.endWritingErr()
 
         output.endWritingErr()
         output.endWritingOut()
@@ -82,6 +82,9 @@ class ReaderHook(Hook):
     def __init__(self,hookFunction:Callable[[Output],None],voidStdOut=False,voidStdErr=False):
         self.__output = WritableOutput()
         self.__splitof = WritableOutput()
+        self.__voidStdErr = voidStdErr
+        self.__voidStdOut = voidStdOut
+
 
     def startHookFunction(self,comandOutput:Output):
         p1 = Process(
