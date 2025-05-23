@@ -41,50 +41,55 @@ class ReaderHook(Hook):
 
     @staticmethod
     def pasAlongStdOut(input:Output ,output:WritableOutput,splitof:WritableOutput,void_stdout:bool):
+
+
+        output.endWritingErr()
+        splitof.endWritingErr()
+
         while True:
             data = input.readOut(1)
             if not data:
                 break
             output.writeOut(data)
-            # if not void_stdout:
-            splitof.writeOut(data)
-        # output.endWritingOut()
-        #if not already ended end the splitof datastream
-        if not void_stdout:
-            print("?????")
-            # splitof.endWritingOut()
-
-        output.endWritingErr()
+            if not void_stdout:
+                splitof.writeOut(data)
         output.endWritingOut()
-        splitof.endWritingErr()
-        splitof.endWritingOut()
+
+        if not void_stdout:
+            splitof.endWritingOut()
 
     @staticmethod
     def pasAlongStdErr(input:Output ,output:WritableOutput,splitof:WritableOutput,void_stderr:bool):
+
+        output.endWritingOut()
+        splitof.endWritingOut()
+
         while True:
             data = input.readErr(1)
             if not data:
                 break
             output.writeErr(data)
-            # if not void_stderr:
-            splitof.writeErr(data)
-        # output.endWritingErr()
-        #if not already ended end the splitof datastream
-        if not void_stderr:
-            print("?????")
-            # splitof.endWritingErr()
-
+            if not void_stderr:
+                splitof.writeErr(data)
         output.endWritingErr()
-        output.endWritingOut()
-        splitof.endWritingErr()
-        splitof.endWritingOut()
+
+        if not void_stderr:
+            splitof.endWritingErr()
 
     def __init__(self,hookFunction:Callable[[Output],None],voidStdOut=False,voidStdErr=False):
         self.__output = WritableOutput()
         self.__splitof = WritableOutput()
+        self.hookfunction = hookFunction
         self.__voidStdErr = voidStdErr
         self.__voidStdOut = voidStdOut
 
+
+    @staticmethod
+    def hookwrap(input:WritableOutput,hookfunction):
+
+        input.endWritingOut()
+        input.endWritingErr()
+        hookfunction(input)
 
     def startHookFunction(self,comandOutput:Output):
         p1 = Process(
@@ -105,15 +110,16 @@ class ReaderHook(Hook):
                 self.__voidStdErr
             )
         )
-        # p3 = Process(
-        #     target=self.hookFunction,
-        #     args=(
-        #         self.__splitof,
-        #     )
-        # )
+        p3 = Process(
+            target=self.hookwrap,
+            args=(
+                self.__splitof,
+                self.hookfunction
+            )
+        )
         p1.start()
         p2.start()
-        # p3.start()
+        p3.start()
         self.__output.endWritingErr()
         self.__output.endWritingOut()
         self.__splitof.endWritingErr()

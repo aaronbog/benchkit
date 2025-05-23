@@ -166,6 +166,20 @@ def shell_out_new(
     else:
         stderr_out = subprocess.PIPE
 
+    def logger_hook_out(input:Output):
+        a = input.readOut_line()
+        while a:
+            print(f"[OUT]{a!r}")
+            a = input.readOut_line()
+        print("rhook done")
+
+    def logger_hook_err(input:Output):
+        a = input.readErr_line()
+        while a:
+            print(f"[OUT]{a!r}")
+            a = input.readErr_line()
+        print("rhook done")
+
     def whook(input:Output ,output:WritableOutput):
         sleep(1)
         a = input.readOut(10)
@@ -186,10 +200,8 @@ def shell_out_new(
 
 
 
-    testhook = WriterHook(whook)
-    # testhook2 = WriterHook(whook)
-    testhook2 = ReaderHook(rhook)
-
+    testhook = ReaderHook(logger_hook_out)
+    testhook2 = ReaderHook(logger_hook_err)
 
     with subprocess.Popen(
         stringCommand,

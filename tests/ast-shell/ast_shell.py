@@ -116,7 +116,7 @@ def test():
 
 
     a = shell_out_new(
-        "ssh aaronb@soft24.vub.ac.be -p 22 'perf stat sleep 1'", print_output=True, output_is_log=True
+        "ssh aaronb@soft24.vub.ac.be -p 22 'perf stat sleep 1'", print_output=True, output_is_log=True,redirect_stderr_to_stdout=False
     )
     print("--------------------")
     print(a)

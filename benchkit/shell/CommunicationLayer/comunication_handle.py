@@ -9,6 +9,10 @@ class Output(ABC):
     """interface to communicate with command output on all platforms,
     functions are  due to compatibility"""
 
+    def __init__(self):
+        self.__bufferd_out:bytes = b''
+        self.__bufferd_err:bytes = b''
+
     @abstractmethod
     def readOut(self, amount_of_bytes: int) -> bytes:
         """reads at most amount_of_bytes from the available stdout"""
@@ -26,6 +30,26 @@ class Output(ABC):
     @abstractmethod
     def getReaderFdErr(self) -> int:
         pass
+
+    def readOut_line(self) -> bytes:
+        byt = self.readOut(10)
+        while byt:
+            sp = byt.split(b'\n')
+            if len(sp) > 1:
+                self.__bufferd_out = sp[1]
+                return sp[0]
+            byt += self.readOut(10)
+        return byt
+
+    def readErr_line(self) -> bytes:
+        byt = self.readErr(10)
+        while byt:
+            sp = byt.split(b'\n')
+            if len(sp) > 1:
+                self.__bufferd_err = sp[1]
+                return sp[0]
+            byt += self.readErr(10)
+        return byt
 
 class SshOutput(Output):
     def __init__(self,out,err):
@@ -55,34 +79,44 @@ class WritableOutput(Output):
         os.set_inheritable(self.readerErr,True)
         os.set_inheritable(self.writerOut,True)
         os.set_inheritable(self.writerErr,True)
+        super().__init__()
 
     def writeOut(self, bytes_to_write: bytes) -> None:
         os.write(self.writerOut, bytes_to_write)
 
-    def endWritingOut(self) -> None:
-        os.close(self.writerOut)
-
-    def readOut(self, amount_of_bytes: int) -> bytes:
-        return os.read(self.readerOut, amount_of_bytes)
-
-    def getReaderFdOut(self) -> int:
-        return self.readerOut
-
-    def getWriterFdOut(self) -> int:
-        return self.writerOut
-
     def writeErr(self, bytes_to_write: bytes) -> None:
         os.write(self.writerErr, bytes_to_write)
+
+    def endWritingOut(self) -> None:
+        os.close(self.writerOut)
 
     def endWritingErr(self) -> None:
         os.close(self.writerErr)
 
+    def readOut(self, amount_of_bytes: int) -> bytes:
+        if self.__bufferd_out:
+            ret = self.__bufferd_out
+            self.__bufferd_out = b''
+            return ret
+        return os.read(self.readerOut, amount_of_bytes)
+
     def readErr(self, amount_of_bytes: int) -> bytes:
+        if self.__bufferd_err:
+            ret = self.__bufferd_err
+            self.__bufferd_err = b''
+            return ret
         return os.read(self.readerErr, amount_of_bytes)
 
 
+    def getReaderFdOut(self) -> int:
+        return self.readerOut
+
     def getReaderFdErr(self) -> int:
         return self.readerErr
+
+    def getWriterFdOut(self) -> int:
+        return self.writerOut
+
 
     def getWriterFdErr(self) -> int:
         return self.writerErr
