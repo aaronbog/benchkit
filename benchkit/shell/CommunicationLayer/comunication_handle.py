@@ -27,6 +27,23 @@ class Output(ABC):
     def getReaderFdErr(self) -> int:
         pass
 
+class SshOutput(Output):
+    def __init__(self,out,err):
+        self.__out = out
+        self.__err = err
+
+    def readErr(self, amount_of_bytes):
+        return self.__err.read(amount_of_bytes)
+
+    def readOut(self, amount_of_bytes):
+        return self.__out.read(amount_of_bytes)
+
+    def getReaderFdOut(self):
+        return self.__out
+
+    def getReaderFdErr(self):
+        return self.__err
+
 
 class WritableOutput(Output):
     """A way to create a fileStream that can be used as a CommandOutput by other functions"""
@@ -34,6 +51,10 @@ class WritableOutput(Output):
     def __init__(self) -> None:
         self.readerOut, self.writerOut = os.pipe()
         self.readerErr, self.writerErr = os.pipe()
+        os.set_inheritable(self.readerOut,True)
+        os.set_inheritable(self.readerErr,True)
+        os.set_inheritable(self.writerOut,True)
+        os.set_inheritable(self.writerErr,True)
 
     def writeOut(self, bytes_to_write: bytes) -> None:
         os.write(self.writerOut, bytes_to_write)
@@ -58,6 +79,7 @@ class WritableOutput(Output):
 
     def readErr(self, amount_of_bytes: int) -> bytes:
         return os.read(self.readerErr, amount_of_bytes)
+
 
     def getReaderFdErr(self) -> int:
         return self.readerErr

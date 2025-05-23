@@ -7,8 +7,11 @@ import shlex
 import subprocess
 import sys
 from multiprocessing import Process, Queue
+from time import sleep
 from typing import Dict, Iterable, List, Optional
 
+from benchkit.shell.CommunicationLayer.comunication_handle import Output, SshOutput, WritableOutput
+from benchkit.shell.CommunicationLayer.hook import ReaderHook, WriterHook
 from benchkit.shell.commandAST import command as makecommand
 from benchkit.shell.commandAST.nodes.commandNodes import CommandNode
 from benchkit.shell.commandAST.visitor import getString
@@ -139,12 +142,12 @@ def shell_out_new(
             str: content of stdout.
         """
         outlines = []
-        outline = try_conventing_bystring_to_readable_characters(std_in.readline())
+        outline = try_conventing_bystring_to_readable_characters(os.read(std_in,10))
 
         while outline:
             print(outline, end="")
             outlines.append(outline)
-            outline = try_conventing_bystring_to_readable_characters(std_in.readline())
+            outline = try_conventing_bystring_to_readable_characters(os.read(std_in,10))
         return outlines
 
     def flush_thread(std_in, std_err, output_queue):
@@ -162,6 +165,31 @@ def shell_out_new(
         stderr_out = subprocess.STDOUT
     else:
         stderr_out = subprocess.PIPE
+
+    def whook(input:Output ,output:WritableOutput):
+        sleep(1)
+        a = input.readOut(10)
+        while a:
+            print(f"|whook{a!r}|")
+            a = input.readOut(10)
+            output.writeOut(a)
+        print("whook done")
+        output.endWritingErr()
+        output.endWritingOut()
+
+    def rhook(input:Output):
+        a = input.readOut(10)
+        while a:
+            print(f"|rhook{a!r}|")
+            a = input.readOut(10)
+        print("rhook done")
+
+
+
+    testhook = WriterHook(whook)
+    testhook2 = WriterHook(whook)
+    # testhook2 = ReaderHook(rhook)
+
 
     with subprocess.Popen(
         stringCommand,
@@ -183,11 +211,20 @@ def shell_out_new(
                 # while logging stdout in real time, to accomplish this we use multiprocessing
                 # in combination with error catching to interupt the logging if needed
                 output_queue:Queue = Queue()
+
+                pout = SshOutput(shell_process.stdout,shell_process.stderr)
+
+                testhook.startHookFunction(pout)
+                pas = testhook.getPassthrough()
+                testhook2.startHookFunction(pas)
+                past = testhook2.getPassthrough()
+
+
                 logger_process = Process(
                     target=flush_thread,
                     args=(
-                        shell_process.stdout,
-                        shell_process.stderr,
+                        past.getReaderFdOut(),
+                        past.getReaderFdErr(),
                         output_queue,
                     ),
                 )
@@ -228,4 +265,5 @@ def shell_out_new(
             print(output.strip())
 
     assert isinstance(output, str)
+    sleep(2)
     return output
