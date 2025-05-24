@@ -1,7 +1,9 @@
+from __future__ import annotations #Otherwise Queue comlains about typing
 from abc import ABC, abstractmethod
 from multiprocessing import Process, Queue
 from typing import Callable
 from benchkit.shell.CommunicationLayer.comunication_handle import Output, WritableOutput
+
 
 
 # change -> this should be a "result hook" 
@@ -11,7 +13,7 @@ from benchkit.shell.CommunicationLayer.comunication_handle import Output, Writab
 
 class OutputBuffer:
     def __init__(self,out:Output) -> None:
-        self.queue:Queue=Queue()
+        self.queue:Queue[bytes]=Queue()
         self.out=out
 
         logger_process = Process(
@@ -24,7 +26,7 @@ class OutputBuffer:
         logger_process.start()
 
     @staticmethod
-    def result_thread(out:Output,output_queue:Queue) -> None:
+    def result_thread(out:Output,output_queue:Queue[bytes]) -> None:
         outlines:bytes = b''
         outline = out.readOut(10)
         while outline:
