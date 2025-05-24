@@ -1,6 +1,7 @@
 # Copyright (C) 2024 Vrije Universiteit Brussel. All rights reserved.
 # SPDX-License-Identifier: MIT
 
+from io import BufferedReader
 import os
 from abc import ABC, abstractmethod
 
@@ -42,14 +43,6 @@ class Output(ABC):
             return ret
         return self._read_bytes_err(amount_of_bytes)
 
-    @abstractmethod
-    def getReaderFdOut(self) -> int:
-        pass
-
-    @abstractmethod
-    def getReaderFdErr(self) -> int:
-        pass
-
     def readOut_line(self) -> bytes:
         byt = self.readOut(10)
         while byt:
@@ -71,22 +64,16 @@ class Output(ABC):
         return byt
 
 class SshOutput(Output):
-    def __init__(self,out,err):
+    def __init__(self,out:BufferedReader,err:BufferedReader):
         self.__out = out
         self.__err = err
         super().__init__()
 
-    def _read_bytes_err(self, amount_of_bytes) -> bytes:
+    def _read_bytes_err(self, amount_of_bytes:int) -> bytes:
         return self.__err.read(amount_of_bytes)
 
-    def _read_bytes_out(self, amount_of_bytes) -> bytes:
+    def _read_bytes_out(self, amount_of_bytes:int) -> bytes:
         return self.__out.read(amount_of_bytes)
-
-    def getReaderFdOut(self):
-        return self.__out
-
-    def getReaderFdErr(self):
-        return self.__err
 
 
 class WritableOutput(Output):
@@ -118,20 +105,6 @@ class WritableOutput(Output):
 
     def _read_bytes_err(self, amount_of_bytes: int) -> bytes:
         return os.read(self.readerErr, amount_of_bytes)
-
-
-    def getReaderFdOut(self) -> int:
-        return self.readerOut
-
-    def getReaderFdErr(self) -> int:
-        return self.readerErr
-
-    def getWriterFdOut(self) -> int:
-        return self.writerOut
-
-
-    def getWriterFdErr(self) -> int:
-        return self.writerErr
 
 
 """File notes OUTDATED KEPT FOR REFERENCE FOR A BIT
