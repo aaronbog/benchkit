@@ -12,16 +12,35 @@ class Output(ABC):
     def __init__(self):
         self.__bufferd_out:bytes = b''
         self.__bufferd_err:bytes = b''
+        self.a = 2
+
 
     @abstractmethod
+    def _read_bytes_out(self, amount_of_bytes: int) -> bytes:
+        pass
+    
+    @abstractmethod
+    def _read_bytes_err(self, amount_of_bytes: int) -> bytes:
+        pass
+
     def readOut(self, amount_of_bytes: int) -> bytes:
         """reads at most amount_of_bytes from the available stdout"""
-        pass
+        if self.__bufferd_out:
+            ret = self.__bufferd_out
+            self.__bufferd_out = b''
+            self.a = 0
+            return ret
+        self.a += 1
+        # print(f'come from buffer non {self.a}')
+        return self._read_bytes_out(amount_of_bytes)
 
-    @abstractmethod
     def readErr(self, amount_of_bytes: int) -> bytes:
         """reads at most amount_of_bytes from the available stderr"""
-        pass
+        if self.__bufferd_err:
+            ret = self.__bufferd_err
+            self.__bufferd_err = b''
+            return ret
+        return self._read_bytes_err(amount_of_bytes)
 
     @abstractmethod
     def getReaderFdOut(self) -> int:
@@ -55,11 +74,12 @@ class SshOutput(Output):
     def __init__(self,out,err):
         self.__out = out
         self.__err = err
+        super().__init__()
 
-    def readErr(self, amount_of_bytes):
+    def _read_bytes_err(self, amount_of_bytes) -> bytes:
         return self.__err.read(amount_of_bytes)
 
-    def readOut(self, amount_of_bytes):
+    def _read_bytes_out(self, amount_of_bytes) -> bytes:
         return self.__out.read(amount_of_bytes)
 
     def getReaderFdOut(self):
@@ -93,18 +113,10 @@ class WritableOutput(Output):
     def endWritingErr(self) -> None:
         os.close(self.writerErr)
 
-    def readOut(self, amount_of_bytes: int) -> bytes:
-        if self.__bufferd_out:
-            ret = self.__bufferd_out
-            self.__bufferd_out = b''
-            return ret
+    def _read_bytes_out(self, amount_of_bytes: int) -> bytes:
         return os.read(self.readerOut, amount_of_bytes)
 
-    def readErr(self, amount_of_bytes: int) -> bytes:
-        if self.__bufferd_err:
-            ret = self.__bufferd_err
-            self.__bufferd_err = b''
-            return ret
+    def _read_bytes_err(self, amount_of_bytes: int) -> bytes:
         return os.read(self.readerErr, amount_of_bytes)
 
 

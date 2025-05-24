@@ -1,9 +1,41 @@
 from abc import ABC, abstractmethod
-import asyncio
-from multiprocessing import Process
-from threading import Thread
-from typing import Any, Callable, Coroutine
+from multiprocessing import Process, Queue
+from typing import Callable
 from benchkit.shell.CommunicationLayer.comunication_handle import Output, WritableOutput
+
+
+# change -> this should be a "result hook" 
+#           -> Hook should be a pastrough hook
+#           -> Hook should have getPassthrough() removed
+# This would allow for composition where every hook needs to end in a result hook (deafault is voiding it -> would be async)
+
+class OutputBuffer:
+    def __init__(self,out:Output) -> None:
+        self.queue:Queue=Queue()
+        self.out=out
+
+        logger_process = Process(
+                    target=self.result_thread,
+                    args=(
+                        self.out,
+                        self.queue,
+                    ),
+                )
+        logger_process.start()
+
+    @staticmethod
+    def result_thread(out:Output,output_queue:Queue) -> None:
+        outlines:bytes = b''
+        outline = out.readOut(10)
+        while outline:
+            outlines += outline
+            outline = out.readOut(10)
+        output_queue.put(outlines)
+
+    def get_result(self) -> bytes:
+        output = self.queue.get()
+        return output
+
 
 class Hook(ABC):
     @abstractmethod
@@ -13,7 +45,6 @@ class Hook(ABC):
     @abstractmethod
     def getPassthrough(self) -> WritableOutput:
         pass
-
 
 class WriterHook(Hook):
     def __init__(self,hookFunction:Callable[[Output,WritableOutput],None]):
@@ -41,8 +72,6 @@ class ReaderHook(Hook):
 
     @staticmethod
     def pasAlongStdOut(input:Output ,output:WritableOutput,splitof:WritableOutput,void_stdout:bool):
-
-
         output.endWritingErr()
         splitof.endWritingErr()
 
@@ -76,7 +105,7 @@ class ReaderHook(Hook):
         if not void_stderr:
             splitof.endWritingErr()
 
-    def __init__(self,hookFunction:Callable[[Output],None],voidStdOut=False,voidStdErr=False):
+    def __init__(self,hookFunction:Callable[[Output],None],voidStdOut:bool=False,voidStdErr:bool=False):
         self.__output = WritableOutput()
         self.__splitof = WritableOutput()
         self.hookfunction = hookFunction
@@ -85,7 +114,7 @@ class ReaderHook(Hook):
 
 
     @staticmethod
-    def hookwrap(input:WritableOutput,hookfunction):
+    def hookwrap(input:WritableOutput,hookfunction:Callable[[Output],None]):
 
         input.endWritingOut()
         input.endWritingErr()
@@ -124,9 +153,6 @@ class ReaderHook(Hook):
         self.__output.endWritingOut()
         self.__splitof.endWritingErr()
         self.__splitof.endWritingOut()
-
-
-
 
     def getPassthrough(self):
         return self.__output

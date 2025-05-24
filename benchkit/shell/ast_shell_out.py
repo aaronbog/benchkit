@@ -5,13 +5,12 @@ import os
 import pathlib
 import shlex
 import subprocess
-import sys
 from multiprocessing import Process, Queue
 from time import sleep
 from typing import Dict, Iterable, List, Optional
 
 from benchkit.shell.CommunicationLayer.comunication_handle import Output, SshOutput, WritableOutput
-from benchkit.shell.CommunicationLayer.hook import ReaderHook, WriterHook
+from benchkit.shell.CommunicationLayer.hook import OutputBuffer, ReaderHook
 from benchkit.shell.commandAST import command as makecommand
 from benchkit.shell.commandAST.nodes.commandNodes import CommandNode
 from benchkit.shell.commandAST.visitor import getString
@@ -125,41 +124,11 @@ def shell_out_new(
     stringCommand = getString(commandTree)
 
 
-    def try_conventing_bystring_to_readable_characters(bytestring):
+    def try_conventing_bystring_to_readable_characters(bytestring:bytes) -> str|bytes:
         try:
-            bytestring = bytestring.decode('utf-8')
+            return bytestring.decode('utf-8')
         except Exception:
-            pass
-        return bytestring
-
-    def flush_outlines(std_in):
-        """
-        prints and returns the current content of stdout for a given process
-        Args:
-            process (Popen):
-                process to log
-        Returns:
-            str: content of stdout.
-        """
-        outlines = []
-        outline = try_conventing_bystring_to_readable_characters(os.read(std_in,10))
-
-        while outline:
-            print(outline, end="")
-            outlines.append(outline)
-            outline = try_conventing_bystring_to_readable_characters(os.read(std_in,10))
-        return outlines
-
-    def flush_thread(std_in, std_err, output_queue):
-        """
-        while process is running will log and store all stdout in real time
-        Args:
-            output_queue (Queue):
-                Queue to write the returned value to
-        Returns:
-            None
-        """
-        output_queue.put("".join(flush_outlines(std_in)))
+            return bytestring
 
     if redirect_stderr_to_stdout:
         stderr_out = subprocess.STDOUT
@@ -169,39 +138,20 @@ def shell_out_new(
     def logger_hook_out(input:Output):
         a = input.readOut_line()
         while a:
-            print(f"[OUT]{a!r}")
+            print(f"\33[34m[OUT | {stringCommand}] {try_conventing_bystring_to_readable_characters(a)}\033[0m")
             a = input.readOut_line()
-        print("rhook done")
+        print(f"{a!r}")
+        print("rhook stdout done")
 
     def logger_hook_err(input:Output):
         a = input.readErr_line()
         while a:
-            print(f"[OUT]{a!r}")
+            print(f"\033[91m[ERR | {stringCommand}] {try_conventing_bystring_to_readable_characters(a)}\033[0m")
             a = input.readErr_line()
-        print("rhook done")
+        print("rhook stderr done")
 
-    def whook(input:Output ,output:WritableOutput):
-        sleep(1)
-        a = input.readOut(10)
-        while a:
-            print(f"|whook{a!r}|")
-            a = input.readOut(10)
-            output.writeOut(a)
-        print("whook done")
-        output.endWritingErr()
-        output.endWritingOut()
-
-    def rhook(input:Output):
-        a = input.readOut(10)
-        while a:
-            print(f"|rhook{a!r}|")
-            a = input.readOut(10)
-        print("rhook done")
-
-
-
-    testhook = ReaderHook(logger_hook_out)
-    testhook2 = ReaderHook(logger_hook_err)
+    log_std_out_hook = ReaderHook(logger_hook_out)
+    log_std_err_hook = ReaderHook(logger_hook_err)
 
     with subprocess.Popen(
         stringCommand,
@@ -215,53 +165,26 @@ def shell_out_new(
         if shell_process.stdin is not None and std_input is not None:
             shell_process.stdin.write(std_input.encode('utf-8'))
             shell_process.stdin.flush()
+        
+        command_output = SshOutput(shell_process.stdout,shell_process.stderr)
 
         if output_is_log:
-            try:
+            log_std_out_hook.startHookFunction(command_output)
+            pas = log_std_out_hook.getPassthrough()
+            log_std_err_hook.startHookFunction(pas)
+            command_output = log_std_err_hook.getPassthrough()
 
-                # logging the process takes two threads since we need to wait for the timeout
-                # while logging stdout in real time, to accomplish this we use multiprocessing
-                # in combination with error catching to interupt the logging if needed
-                output_queue:Queue = Queue()
+        try:
 
-                pout = SshOutput(shell_process.stdout,shell_process.stderr)
+            buffer = OutputBuffer(command_output)
+            retcode = shell_process.wait(timeout=timeout)
+            output = try_conventing_bystring_to_readable_characters(buffer.get_result())
 
-                testhook.startHookFunction(pout)
-                pas = testhook.getPassthrough()
-                testhook2.startHookFunction(pas)
-                past = testhook2.getPassthrough()
+        except subprocess.TimeoutExpired as err:
+            #killing this will send eof to and end the hooks aswell
+            shell_process.kill()
+            raise err
 
-
-                logger_process = Process(
-                    target=flush_thread,
-                    args=(
-                        past.getReaderFdOut(),
-                        past.getReaderFdErr(),
-                        output_queue,
-                    ),
-                )
-                logger_process.daemon = True
-                logger_process.start()
-                retcode = shell_process.wait(timeout=timeout)
-                logger_process.join()
-                print(f"retcode seq {retcode}")
-                output = output_queue.get()
-
-            except subprocess.TimeoutExpired as err:
-                shell_process.kill()
-                logger_process.terminate()
-                raise err
-
-        else:
-            try:
-                retcode = shell_process.wait(timeout=timeout)
-                if shell_process.stdout is None:
-                    output = ""
-                else:
-                    output = try_conventing_bystring_to_readable_characters(shell_process.stdout.read())
-            except subprocess.TimeoutExpired as err:
-                shell_process.kill()
-                raise err
 
         # not a sucsessfull execution and not an alowed exit code
         # raise the appropriate error
@@ -276,6 +199,5 @@ def shell_out_new(
             print("[OUT]")
             print(output.strip())
 
-    assert isinstance(output, str)
-    sleep(2)
+    # assert isinstance(output, str)
     return output
