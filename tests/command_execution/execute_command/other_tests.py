@@ -114,12 +114,13 @@ def runtest():
 
 
 def shell_test():
-    a = pipe_shell_out('ls | cat')
+    a = pipe_shell_out('sudo perf stat ls')
     print(a)
-    a = pipe_shell_out([script_path_string("runForever"), '|', 'cat'])
-    print(a)
+    # a = pipe_shell_out([script_path_string("runForever"), '|', 'cat'])
+    # print(a)
 
     # shell_interactive("ssh aaronb@soft24.vub.ac.be 'sh'")
+    # sleep(2)
 
 
 def testhalt():
@@ -129,16 +130,15 @@ def testhalt():
     # for end
     # -------------------------------------------------------
 
-    def stdout_pid_result_filter(inputStream:ReadableIOStream,OutputStream:WritableIOStream,queue:Queue[Any]):
-        first_line = inputStream.read_line()
+    def stdout_pid_result_filter(input_stream:ReadableIOStream,output_stream:WritableIOStream,queue:Queue[Any]):
+        first_line = input_stream.read_line()
         queue.put(first_line)
-        outline = inputStream.read(10)
+        outline = input_stream.read(10)
         while outline:
-            OutputStream.write(outline)
-            outline = inputStream.read(10)
+            output_stream.write(outline)
+            outline = input_stream.read(10)
 
     pid_stream_hook = IOResultHook(stdout_pid_result_filter)
-
 
     pid_output_hook = OutputHook(pid_stream_hook,None)
 
@@ -154,7 +154,7 @@ def testhalt():
     # execute_command(["command that does not exist"])
 
     # wrong_retcode = execute_command(["cat", "wafel"],
-    #                                 # success_value=1,
+    #                                 success_value=1,
     #                                 # ignore_ret_codes=(1,),
     #                                 ordered_output_hooks=[void_hook()])
     # print(wrong_retcode.get_return_code())
@@ -195,8 +195,16 @@ def testhalt():
                             ]
                         )
 
-    # print(outobj.get_result())
     # print(ls_command.get_return_code())
+    # print(outobj.get_result())
+
+    # -------------------------------------------------------
+    # cat
+    #   -> works
+    #   -> works remotely
+    #   ->  we want the pid
+    #     -> ugly so we want to get it out early and filter it
+    # -------------------------------------------------------
 
     ls_out_stream = ls_command.get_output().std_out
 
@@ -207,41 +215,20 @@ def testhalt():
 
     # cat_command_string = ["cat"]
     # cat_command_string = shlex.split("ssh aaronb@soft24.vub.ac.be 'cat'")
-    cat_command_string = shlex.split("ssh aaronb@soft24.vub.ac.be 'echo $$; cat'")
+    cat_command_string = shlex.split("ssh aaronb@soft24.vub.ac.be 'echo $$; exec cat'")
 
     cat_command = execute_command(cat_command_string,
                         std_input=ls_out_stream,
                         ordered_output_hooks=[
                             pid_output_hook,
                             log_cat,
-                            # outhook,
                             void_hook(),
                             ]
                         )
 
     print(f'-------\n{pid_stream_hook.get_result()}\n----------')
-
     ls_command.get_return_code()
     cat_command.get_return_code()
-
-
-
-
-    # these can not be reused
-    # log = logger_line_hook(
-    #             f"\033[34m[OUT | ]\033[0m" + " {}",
-    #             f"\033[91m[ERR | ]\033[0m" + " {}",
-    #         )
-
-    # a = execute_command(
-    #     shlex.split("ssh aaronb@soft24.vub.ac.be 'cd test; echo $$; exec sudo -S env varname=varvalue printenv varname'"),
-    #     ordered_output_hooks=[log]
-    # )
-
-
-
-    # r = a.get_return_code()
-    # print(r)
 
 
 if __name__ == "__main__":
