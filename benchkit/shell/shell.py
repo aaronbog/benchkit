@@ -10,20 +10,20 @@ import subprocess
 import sys
 from typing import Iterable, List, Optional
 
-from benchkit.shell.ast_shell_out import execute_command
-from benchkit.shell.CommunicationLayer.CommandProcess import CommandProcess
-from benchkit.shell.CommunicationLayer.hooks.basic_hooks import (
+from benchkit.shell.command_execution.execute import execute_command
+from benchkit.shell.command_execution.command_process import CommandProcess
+from benchkit.shell.command_execution.io.hooks.basic_hooks import (
     logger_line_hook,
     std_out_result_void_err,
     void_hook,
     void_input,
 )
-from benchkit.shell.CommunicationLayer.hooks.hook import (
+from benchkit.shell.command_execution.io.hooks.hook import (
     IOWriterHook,
     MergeErrToOut,
     OutputHook,
 )
-from benchkit.shell.CommunicationLayer.IO_stream import (
+from benchkit.shell.command_execution.io.stream import (
     EmptyIOStream,
     PipeIOStream,
     ReadableIOStream,
@@ -254,7 +254,7 @@ def shell_out(
         # if we need to ignore any error code we just add all of them to the ignore list
         # the overhead of doing this is minimal and it keeps the code cleaner
         if ignore_any_error_code:
-            ignore_ret_codes = (x for x in range(226))
+            ignore_ret_codes = (x for x in range(256))
 
         # add hook to log the output of the command
         if output_is_log:

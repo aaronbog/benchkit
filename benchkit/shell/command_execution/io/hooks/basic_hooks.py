@@ -4,16 +4,18 @@
 from __future__ import annotations  # Otherwise Queue comlains about typing
 
 from multiprocessing import Queue
-from typing import Any
+from typing import Any, Optional
+from pathlib import Path
 
-from benchkit.shell.CommunicationLayer.hooks.hook import (
+from benchkit.shell.command_execution.io.hooks.hook import (
     IOReaderHook,
     IOResultHook,
     IOWriterHook,
     OutputHook,
 )
-from benchkit.shell.CommunicationLayer.IO_stream import (
+from benchkit.shell.command_execution.io.stream import (
     ReadableIOStream,
+    StringIOStream,
     WritableIOStream,
     try_converting_bystring_to_readable_characters,
 )
@@ -21,7 +23,7 @@ from benchkit.shell.CommunicationLayer.IO_stream import (
 
 def create_voiding_result_hook() -> IOResultHook:
     def hook_function(
-        input_object: ReadableIOStream, _: WritableIOStream, result_queue: Queue[Any]
+        input_object: ReadableIOStream, out: WritableIOStream, result_queue: Queue[Any]
     ):
         # we do not write to the out stream thus this is "voiding"
         outlines: bytes = b""
@@ -33,8 +35,37 @@ def create_voiding_result_hook() -> IOResultHook:
 
     return IOResultHook(hook_function)
 
+def stream_prepend_hook(stream:StringIOStream):
+    def hook_function(
+        input_object: ReadableIOStream, output_object: WritableIOStream,
+    ):
+        outline = stream.read(10)
+        while outline:
+            output_object.write(outline)
+            outline = input_object.read(10)
+        outline = input_object.read(10)
+        while outline:
+            output_object.write(outline)
+            outline = input_object.read(10)
 
-def create_stream_line_logger_hook(formating_string: str) -> IOReaderHook:
+    return IOWriterHook(hook_function)
+
+def write_to_file_hook(path:Path,mode:str="a"):
+    def hook_function(
+        input_object: ReadableIOStream,
+    ):
+        with path.open(mode=f'{mode}b', buffering=0) as file:
+            outline = input_object.read(10)
+            while outline:
+                file.write(outline)
+                outline = input_object.read(10)
+            file.flush()
+
+    return IOReaderHook(hook_function)
+
+
+
+def create_stream_line_logger_hook(formating_string: str, name: Optional[str] = None) -> IOReaderHook:
     def hook_function_line(input_object: ReadableIOStream):
         byt = input_object.read_line()
         while byt:
@@ -43,8 +74,7 @@ def create_stream_line_logger_hook(formating_string: str) -> IOReaderHook:
                 end="",
             )
             byt = input_object.read_line()
-
-    return IOReaderHook(hook_function_line)
+    return IOReaderHook(hook_function_line,name=name)
 
 
 # TODO: Voiding can be done be done better but this will do for now
@@ -57,10 +87,10 @@ def void_input(input_object: ReadableIOStream, _: WritableIOStream):
         outline = input_object.read(10)
 
 
-def logger_line_hook(outformat: str, errformat: str):
+def logger_line_hook(outformat: str, errformat: str,nameout: Optional[str] = None,nameerr: Optional[str] = None):
     return OutputHook(
-        create_stream_line_logger_hook(outformat),
-        create_stream_line_logger_hook(errformat),
+        create_stream_line_logger_hook(outformat,nameout),
+        create_stream_line_logger_hook(errformat,nameerr),
     )
 
 
