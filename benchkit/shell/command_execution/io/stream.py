@@ -15,7 +15,7 @@ class WritableIOStream(ABC):
         """write bytes to the given IOStream needs to be implemented depending on what it is"""
 
     @abstractmethod
-    def end_writing(self) -> None:
+    def close_writer(self) -> None:
         """signal that the IOStream can be closed"""
 
 
@@ -28,6 +28,11 @@ class ReadableIOStream(ABC):
 
     @abstractmethod
     def _read_bytes(self, amount_of_bytes: int) -> bytes:
+        pass
+
+    @abstractmethod
+    def close_reader(self) -> None:
+        """Singnal that the reader can be closed"""
         pass
 
     def read(self, amount_of_bytes: int) -> bytes:
@@ -62,6 +67,9 @@ class PopenIOStream(ReadableIOStream):
             return self.__stream.read(amount_of_bytes)
         return b""
 
+    def close_reader(self) -> None:
+        self.__stream.close()
+
 
 class StringIOStream(ReadableIOStream):
     """Class to convert a string to an IOStream so they can be interchanged"""
@@ -81,8 +89,11 @@ class StringIOStream(ReadableIOStream):
             self.index = self.length
             return return_byte_string
 
+    def close_reader(self) -> None:
+        return
 
-class EmptyIOStream(ReadableIOStream):
+
+class EmptyIOStream(ReadableIOStream,WritableIOStream):
     "Class to create an empty IOStream"
     def __init__(self):
         super().__init__()
@@ -90,25 +101,36 @@ class EmptyIOStream(ReadableIOStream):
     def _read_bytes(self, amount_of_bytes: int):
         return b""
 
+    def close_reader(self) -> None:
+        return
+
+    def write(self, bytes_to_write: bytes) -> None:
+        return
+
+    def close_writer(self) -> None:
+        return
+
 
 class PipeIOStream(ReadableIOStream, WritableIOStream):
     """A readable and writable IOStream that is used to communicate between hooks mostly"""
 
     def __init__(self) -> None:
         self.reader, self.writer = os.pipe()
-        os.set_inheritable(self.reader, True)
-        os.set_inheritable(self.writer, True)
+        # os.set_inheritable(self.reader, True)
+        # os.set_inheritable(self.writer, True)
         super().__init__()
 
     def write(self, bytes_to_write: bytes) -> None:
         os.write(self.writer, bytes_to_write)
 
-    def end_writing(self) -> None:
+    def close_writer(self) -> None:
         os.close(self.writer)
 
     def _read_bytes(self, amount_of_bytes: int) -> bytes:
         return os.read(self.reader, amount_of_bytes)
 
+    def close_reader(self) -> None:
+        os.close(self.reader)
 
 def try_converting_bystring_to_readable_characters(bytestring: bytes) -> str | bytes:
     """ function that will try to convert a bytestring to string

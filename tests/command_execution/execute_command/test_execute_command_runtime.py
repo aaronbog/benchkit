@@ -2,8 +2,12 @@
 
 import pathlib
 from subprocess import TimeoutExpired
+import threading
+import time
 import tracemalloc
 import unittest
+
+from test_execute_command_function import eprint, print_open_fds
 from benchkit.shell.command_execution.execute import execute_command
 from tests.command_execution.execute_command.util import TestTimeout, generate_test_hook_lists, get_arguments_dict_list, script_path_string, timeout
 
@@ -13,6 +17,7 @@ class RuntimeExecutionTests(unittest.TestCase):
 
     # @unittest.skip("disabled for debugging")
     def test_timeout(self) -> None:
+        print_open_fds()
         """test to see if the command times out after the given time period"""
 
         # standard arguments
@@ -46,9 +51,11 @@ class RuntimeExecutionTests(unittest.TestCase):
                     self.fail(
                         "execution timed out, but not by the timeout argument"
                     )
+        print_open_fds()
 
     # @unittest.skip("disabled for debugging")
     def test_fill_std_err(self) -> None:
+        print_open_fds()
         """test to see if the command times out after the given time period"""
 
         # standard arguments
@@ -61,9 +68,11 @@ class RuntimeExecutionTests(unittest.TestCase):
             }
         )
         for arguments in arguments_list:
+            t = time.time()
             # hook based argumens
             hooklist = generate_test_hook_lists()
             for input_hooks,output_hooks,_ in hooklist:
+                eprint(arguments)
                 try:
                 # execution
                     with timeout(22):
@@ -76,16 +85,17 @@ class RuntimeExecutionTests(unittest.TestCase):
 
                         # result gathering
                         p.get_return_code()
-
                 except TestTimeout:
                     self.fail(
                         "execution timed out"
                     )
+            eprint(time.time() - t)
+        print_open_fds()
 
     # @unittest.skip("disabled for debugging")
     def test_fill_std_out(self) -> None:
         """test to see if the command times out after the given time period"""
-
+        print_open_fds()
         # standard arguments
         arguments_list = get_arguments_dict_list(
             {
@@ -96,6 +106,9 @@ class RuntimeExecutionTests(unittest.TestCase):
             }
         )
         for arguments in arguments_list:
+            eprint(arguments)
+            for thread in threading.enumerate():
+                eprint(f"    {thread.name}")
             # hook based argumens
             hooklist = generate_test_hook_lists()
             for input_hooks,output_hooks,_ in hooklist:
@@ -116,3 +129,5 @@ class RuntimeExecutionTests(unittest.TestCase):
                     self.fail(
                         "execution timed out"
                     )
+            print_open_fds()
+        print_open_fds()

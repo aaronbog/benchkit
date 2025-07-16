@@ -81,10 +81,11 @@ def create_stream_line_logger_hook(formating_string: str, name: Optional[str] = 
 # problem: if there are hooks on the output they will wait for input still
 # can be resolved by making use of EmptyIOStream
 # Needs to be done on a higher level than hooks
-def void_input(input_object: ReadableIOStream, _: WritableIOStream):
+def void_input(input_object: ReadableIOStream, x: WritableIOStream):
     outline = input_object.read(10)
     while outline:
         outline = input_object.read(10)
+
 
 
 def logger_line_hook(outformat: str, errformat: str,nameout: Optional[str] = None,nameerr: Optional[str] = None):
@@ -95,12 +96,12 @@ def logger_line_hook(outformat: str, errformat: str,nameout: Optional[str] = Non
 
 
 def void_hook():
-    return OutputHook(IOWriterHook(void_input), IOWriterHook(void_input))
+    return OutputHook(IOWriterHook(void_input,sink=True), IOWriterHook(void_input,sink=True))
 
 
 def std_out_result_void_err():
     output_hook_object = create_voiding_result_hook()
 
-    voiding_result_hook = OutputHook(output_hook_object, IOWriterHook(void_input))
+    voiding_result_hook = OutputHook(output_hook_object, IOWriterHook(void_input,sink=True))
 
     return (output_hook_object, voiding_result_hook)

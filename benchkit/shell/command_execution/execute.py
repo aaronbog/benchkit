@@ -71,6 +71,7 @@ def execute_command(
 
         if std_input is not None:
             hook = IOWriterHook(pasalong)
+            hook.get_outgoing_io_stream().close_reader()
             hook.start_hook_function(std_input)
         # if process.stdin is not None:
             # process.stdin.close()

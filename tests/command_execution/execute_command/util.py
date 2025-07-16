@@ -7,7 +7,7 @@ import signal
 from typing import Any, Dict, List, Optional, Tuple
 
 from benchkit.shell.command_execution.io.stream import ReadableIOStream, WritableIOStream
-from benchkit.shell.command_execution.io.hooks.basic_hooks import create_stream_line_logger_hook, create_voiding_result_hook, logger_line_hook, void_hook
+from benchkit.shell.command_execution.io.hooks.basic_hooks import create_stream_line_logger_hook, create_voiding_result_hook, logger_line_hook, void_hook, void_input
 from benchkit.shell.command_execution.io.hooks.hook import IOHook, IOResultHook, IOWriterHook, OutputHook
 
 
@@ -86,7 +86,7 @@ def generate_test_hook_lists(force_output:bool=False,dont_void_output:bool=False
 
     def gen_result_output():
         output_hook_object = create_voiding_result_hook()
-        voiding_result_hook = OutputHook(output_hook_object,None)
+        voiding_result_hook = OutputHook(output_hook_object,IOWriterHook(void_input))
         return voiding_result_hook, output_hook_object
 
     hooklist:List[Tuple[List[IOHook],List[OutputHook],Optional[IOResultHook]]] = []

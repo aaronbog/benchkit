@@ -1,16 +1,38 @@
+import inspect
+import io
 import os
 import pathlib
 from subprocess import CalledProcessError
+import sys
+import tracemalloc
 import unittest
 
 from benchkit.shell.command_execution.io.stream import StringIOStream
 from tests.command_execution.execute_command.util import TestTimeout, generate_test_hook_lists, get_arguments_dict_list, script_path_string, timeout
 from benchkit.shell.command_execution.execute import execute_command
 
+tracemalloc.start()
+
+def eprint(s):
+    print(s,file=sys.stderr)
+
+descriptors = set()
+def print_open_fds(print_all=False):
+    global descriptors
+    (frame, filename, line_number, function_name, lines, index) = inspect.getouterframes(inspect.currentframe())[1]
+    fds = set(os.listdir('/proc/self/fd/'))
+    new_fds = fds - descriptors
+    closed_fds = descriptors - fds
+    descriptors = fds
+
+
+    eprint("{}:{} ALL file descriptors: {}".format(filename, line_number, len(fds)))
+
 class FunctionalExecutionTests(unittest.TestCase):
 
     # @unittest.skip("disabled for debugging")
     def test_echo(self) -> None:
+        print_open_fds()
         """Basic tests to see if the command-line executes the command and can return output"""
 
         # standard arguments
@@ -30,7 +52,7 @@ class FunctionalExecutionTests(unittest.TestCase):
                 try:
                 # execution
                     with timeout(5):
-                        execute_command(
+                        a = execute_command(
                                 ["echo", "benchkit_echo_test", str(arguments)],
                                 ordered_output_hooks=output_hooks,
                                 ordered_input_hooks=input_hooks,
@@ -38,6 +60,7 @@ class FunctionalExecutionTests(unittest.TestCase):
                             )
 
                         # result gathering
+                        a.get_return_code()
                         output = result_hook_object.get_result()
                         expected_output = f"benchkit_echo_test {str(arguments)}\n".encode("utf-8")
                         self.assertEqual(
@@ -49,9 +72,11 @@ class FunctionalExecutionTests(unittest.TestCase):
                     self.fail(
                         "execution timed out"
                     )
+        print_open_fds()
 
     # @unittest.skip("disabled for debugging")
     def test_environment(self) -> None:
+        print_open_fds()
         """Test to see if the env of the command is correcly set to the given env"""
 
         # standard arguments
@@ -98,9 +123,11 @@ class FunctionalExecutionTests(unittest.TestCase):
                     self.fail(
                         "execution timed out"
                     )
+        print_open_fds()
 
     # @unittest.skip("disabled for debugging")
     def test_dir(self) -> None:
+        print_open_fds()
         """Test to see if the correct directory is used when running commands"""
         def expected_full_path(path_lib:pathlib.Path):
             expected_path = os.getcwd()
@@ -160,10 +187,12 @@ class FunctionalExecutionTests(unittest.TestCase):
                     self.fail(
                         "execution timed out"
                     )
+        print_open_fds()
 
 
     # @unittest.skip("disabled for debugging")
     def test_input(self):
+        print_open_fds()
         """testing the use of the std_input parameter"""
          # standard arguments
         arguments_list = get_arguments_dict_list(
@@ -200,10 +229,12 @@ class FunctionalExecutionTests(unittest.TestCase):
                     self.fail(
                         "execution timed out"
                     )
+        print_open_fds()
 
 
     # @unittest.skip("disabled for debugging")
     def test_ignore_ret_codes_are_ignored(self) -> None:
+        print_open_fds()
         # standard arguments
         arguments_list = get_arguments_dict_list(
             {
@@ -251,9 +282,12 @@ class FunctionalExecutionTests(unittest.TestCase):
                     self.fail(
                         f"process trew an error with retcode {retcode_to_output} and ignored list {arguments['ignore_ret_codes']}"
                     )
+        print_open_fds()
+
 
     # @unittest.skip("disabled for debugging")
     def test_ignore_ret_codes_dont_ignore_other(self) -> None:
+        print_open_fds()
         # standard arguments
         arguments_list = get_arguments_dict_list(
             {
@@ -301,6 +335,7 @@ class FunctionalExecutionTests(unittest.TestCase):
                     self.fail(
                         "execution timed out"
                     )
+        print_open_fds()
 
 if __name__ == "__main__":
     unittest.main()

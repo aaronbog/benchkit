@@ -1,7 +1,11 @@
 # Copyright (C) 2025 Vrije Universiteit Brussel. All rights reserved.
 # SPDX-License-Identifier: MIT
 
-from __future__ import annotations  # Otherwise Queue comlains about typing
+from __future__ import annotations
+import inspect
+import os  # Otherwise Queue comlains about typing
+
+import matplotlib.pyplot as plt
 
 from multiprocessing import Queue
 from pathlib import Path
@@ -9,11 +13,11 @@ import shlex
 import subprocess
 import sys
 import threading
-from time import sleep
+from time import sleep, time
 from typing import Any
 
-from benchkit.shell.command_execution.io.hooks.basic_hooks import logger_line_hook, std_out_result_void_err, void_hook
-from benchkit.shell.command_execution.io.hooks.hook import MergeErrToOut
+from benchkit.shell.command_execution.io.hooks.basic_hooks import create_stream_line_logger_hook, logger_line_hook, std_out_result_void_err, void_hook
+from benchkit.shell.command_execution.io.hooks.hook import IOResultHook, MergeErrToOut, OutputHook
 from tests.command_execution.execute_command.util import script_path_string
 
 from benchkit.shell.command_execution.execute import execute_command
@@ -79,6 +83,43 @@ def shell_test():
 
     # shell_interactive("ssh aaronb@soft24.vub.ac.be 'sh'")
 
+descriptors = set()
+def print_open_fds(print_all=False):
+    global descriptors
+    (frame, filename, line_number, function_name, lines, index) = inspect.getouterframes(inspect.currentframe())[1]
+    fds = set(os.listdir('/proc/self/fd/'))
+    new_fds = fds - descriptors
+    closed_fds = descriptors - fds
+    descriptors = fds
+
+
+    print("{}:{} ALL file descriptors: {}".format(filename, line_number, len(fds)))
+
+def gen_logging_input():
+        return create_stream_line_logger_hook("log_input" + " {}")
+
+def test_descriptors():
+    times = []
+    itter = 20000
+    for x in range(itter):
+        l = logger_line_hook(
+            "\033[34m[OUT | ]\033[0m" + " {}",
+            "\033[91m[ERR | ]\033[0m" + " {}",
+        )
+        print(x/itter)
+        print_open_fds()
+        starttime = time()
+        _, h = std_out_result_void_err()
+        c = execute_command(['ls'],ordered_input_hooks=[gen_logging_input()],ordered_output_hooks=[l, h])
+        c.get_return_code()
+
+
+
+        r = time() - starttime
+        times.append(r)
+
+    plt.plot(times)
+    plt.show()
 
 def testhalt():
 
@@ -165,7 +206,7 @@ def testhalt():
 
     # cat_command_string = ["cat"]
     # cat_command_string = shlex.split("ssh aaronb@soft24.vub.ac.be 'cat'")
-    cat_command_string = shlex.split("ssh aaronb@soft24.vub.ac.be 'echo $$; cat'")
+    cat_command_string = shlex.split("ssh aaronb@soft24.vub.ac.be 'echo $$; exec cat'")
 
     cat_command = execute_command(cat_command_string,
                         std_input=ls_out_stream,
@@ -203,5 +244,6 @@ def testhalt():
 
 
 if __name__ == "__main__":
-    # testhalt()
-    shell_test()
+    testhalt()
+    # shell_test()
+    # test_descriptors()

@@ -4,9 +4,12 @@
 from __future__ import annotations  # Otherwise Queue comlains about typing
 
 from abc import ABC, abstractmethod
+import inspect
+import os
 from threading import Lock, Thread
 from queue import Queue
-from typing import Any, Callable, Optional
+from time import sleep
+from typing import Any, Callable, List, Optional, Union
 
 from benchkit.shell.command_execution.io.stream import (
     EmptyIOStream,
@@ -16,26 +19,42 @@ from benchkit.shell.command_execution.io.stream import (
 )
 from benchkit.shell.command_execution.io.output import Output
 
+descriptors = set()
+def print_open_fds(print_all=False):
+    global descriptors
+    (frame, filename, line_number, function_name, lines, index) = inspect.getouterframes(inspect.currentframe())[1]
+    fds = set(os.listdir('/proc/self/fd/'))
+    new_fds = fds - descriptors
+    closed_fds = descriptors - fds
+    descriptors = fds
+
+
+    print("{}:{} ALL file descriptors: {}".format(filename, line_number, len(fds)))
 
 class IOHook(ABC):
     """basic interface that each hook needs to implement"""
-    def __init__(self,name:str):
-        self._output = PipeIOStream()
+    def __init__(self,name:str,sink:bool=False):
+        if not sink:
+            self._output:Union[ReadableIOStream,WritableIOStream] = PipeIOStream()
+        else:
+            self._output = EmptyIOStream()
         self.name=name
 
     @abstractmethod
     def start_hook_function(self, input_stream: ReadableIOStream) -> None:
         pass
 
-    def _start_thread_and_cleanup(self,target,args,name,to_close):
-        def _wrap(target,args,to_close:list[WritableIOStream]):
+    def _start_thread_and_cleanup(self,target:Callable[..., None],args:List[Any],name:str,writeStreams:List[WritableIOStream],readstreams:List[ReadableIOStream]) -> None:
+        def _wrap(target:Callable[..., None],args:List[Any],writeStreams:List[WritableIOStream],readstreams:List[ReadableIOStream]):
             target(*args)
-            for stream in to_close:
-                stream.end_writing()
+            for w_stream in writeStreams:
+                w_stream.close_writer()
+            for r_stream in readstreams:
+                r_stream.close_reader()
 
         p = Thread(
             target=_wrap,
-            args=(target,args,to_close),
+            args=(target,args,writeStreams,readstreams),
             name=name,
         )
 
@@ -51,15 +70,15 @@ class IOWriterHook(IOHook):
     """Hook that expects a function of the form Callable[[ReadableIOStream, PipeIOStream]
        intended as a general purpouse stream manupulator"""
 
-    def __init__(self, hook_function: Callable[[ReadableIOStream, PipeIOStream], None], name:Optional[str] = None):
+    def __init__(self, hook_function: Callable[[ReadableIOStream, PipeIOStream], None], name:Optional[str] = None,sink = False):
         self.hook_function = hook_function
         if not name:
             name = self.hook_function.__name__
-        super().__init__(name)
+        super().__init__(name,sink=sink)
 
     def start_hook_function(self, input_stream: ReadableIOStream) -> None:
         # A thread is spawned to keep the hookfunction running on the stream
-        self._start_thread_and_cleanup(self.hook_function,(input_stream, self._output),self.name,[self._output])
+        self._start_thread_and_cleanup(self.hook_function,(input_stream, self._output),self.name,[self._output],[input_stream])
 
 
 class IOReaderHook(IOHook):
@@ -88,13 +107,12 @@ class IOReaderHook(IOHook):
                 input_stream,
                 self._output,
                 self._stream_duplicate,
-            ),self.name + " pasalong",[self._output,self._stream_duplicate])
+            ),self.name + " pasalong",[self._output,self._stream_duplicate],[input_stream])
 
         # A thread is spawned to keep the hookfunction running on the duplicate stream
         self._start_thread_and_cleanup(self.hook_function,(
                 self._stream_duplicate,
-            ),self.name,[])
-
+            ),self.name,[],[self._stream_duplicate])
 
 class IOResultHook(IOHook):
     """Hook that expects a function of the form
@@ -112,7 +130,7 @@ class IOResultHook(IOHook):
 
         self._start_thread_and_cleanup(self.hook_function,
                                        (input_stream, self._output, self.__queue)
-                                       ,self.name,[self._output])
+                                       ,self.name,[self._output],[input_stream])
 
     def get_result(self) -> Any:
         return self.__queue.get()
