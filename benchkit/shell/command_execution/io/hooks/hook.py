@@ -4,12 +4,9 @@
 from __future__ import annotations  # Otherwise Queue comlains about typing
 
 from abc import ABC, abstractmethod
-import inspect
-import os
 from threading import Lock, Thread
 from queue import Queue
-from time import sleep
-from typing import Any, Callable, List, Optional, Union
+from typing import Any, Callable, Iterable, List, Optional, Union
 
 from benchkit.shell.command_execution.io.stream import (
     EmptyIOStream,
@@ -19,23 +16,11 @@ from benchkit.shell.command_execution.io.stream import (
 )
 from benchkit.shell.command_execution.io.output import Output
 
-descriptors = set()
-def print_open_fds(print_all=False):
-    global descriptors
-    (frame, filename, line_number, function_name, lines, index) = inspect.getouterframes(inspect.currentframe())[1]
-    fds = set(os.listdir('/proc/self/fd/'))
-    new_fds = fds - descriptors
-    closed_fds = descriptors - fds
-    descriptors = fds
-
-
-    print("{}:{} ALL file descriptors: {}".format(filename, line_number, len(fds)))
-
 class IOHook(ABC):
     """basic interface that each hook needs to implement"""
     def __init__(self,name:str,sink:bool=False):
         if not sink:
-            self._output:Union[ReadableIOStream,WritableIOStream] = PipeIOStream()
+            self._output:Union[PipeIOStream,EmptyIOStream] = PipeIOStream()
         else:
             self._output = EmptyIOStream()
         self.name=name
@@ -44,7 +29,7 @@ class IOHook(ABC):
     def start_hook_function(self, input_stream: ReadableIOStream) -> None:
         pass
 
-    def _start_thread_and_cleanup(self,target:Callable[..., None],args:List[Any],name:str,writeStreams:List[WritableIOStream],readstreams:List[ReadableIOStream]) -> None:
+    def _start_thread_and_cleanup(self,target:Callable[..., None],args:Iterable[Any],name:str,writeStreams:List[WritableIOStream],readstreams:List[ReadableIOStream]) -> None:
         def _wrap(target:Callable[..., None],args:List[Any],writeStreams:List[WritableIOStream],readstreams:List[ReadableIOStream]):
             target(*args)
             for w_stream in writeStreams:
@@ -70,7 +55,7 @@ class IOWriterHook(IOHook):
     """Hook that expects a function of the form Callable[[ReadableIOStream, PipeIOStream]
        intended as a general purpouse stream manupulator"""
 
-    def __init__(self, hook_function: Callable[[ReadableIOStream, PipeIOStream], None], name:Optional[str] = None,sink = False):
+    def __init__(self, hook_function: Callable[[ReadableIOStream, PipeIOStream], None], name:Optional[str] = None,sink:bool = False):
         self.hook_function = hook_function
         if not name:
             name = self.hook_function.__name__
@@ -119,12 +104,12 @@ class IOResultHook(IOHook):
        Callable[[ReadableIOStream, PipeIOStream, Queue[Any]]
        can be used as a writer hook with the added functionality of
        being being able to use the queue as output"""
-    def __init__(self, hook_function: Callable[[ReadableIOStream, PipeIOStream, Queue[Any]], None], name:Optional[str] = None):
+    def __init__(self, hook_function: Callable[[ReadableIOStream, WritableIOStream, Queue[Any]], None], name:Optional[str] = None,sink:bool=False):
         self.__queue: Queue[Any] = Queue()
         self.hook_function = hook_function
         if not name:
             name = self.hook_function.__name__
-        super().__init__(name)
+        super().__init__(name,sink=sink)
 
     def start_hook_function(self, input_stream: ReadableIOStream) -> None:
 
@@ -161,8 +146,8 @@ class MergeErrToOut(OutputHook):
         self.lock = Lock()
         self.lock.acquire()
 
-        self._std_err_hook:IOWriterHook = IOWriterHook(self.__mergehookfunction,name="merge-hook-err")
-        self._std_out_hook:IOWriterHook = IOWriterHook(self.__mergehookfunction_close,name="merge-hook-out")
+        self._std_err_hook:IOWriterHook = IOWriterHook(self.__mergehookfunction,name="merge-hook-err",sink=True)
+        self._std_out_hook:IOWriterHook = IOWriterHook(self.__mergehookfunction_close,name="merge-hook-out",sink=True)
 
     def __mergehookfunction(self, input_object: ReadableIOStream, _: WritableIOStream):
         outline = input_object.read_line()
@@ -178,7 +163,7 @@ class MergeErrToOut(OutputHook):
             self.std_out.write(outline)
             outline = input_object.read_line()
         self.lock.acquire()
-        self.std_out.end_writing()
+        self.std_out.close_writer()
 
     def attatch(self, output: Output) -> Output:
         self._std_err_hook.start_hook_function(output.std_out)
