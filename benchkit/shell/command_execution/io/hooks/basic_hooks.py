@@ -3,7 +3,7 @@
 
 from __future__ import annotations  # Otherwise Queue comlains about typing
 
-from multiprocessing import Queue
+from queue import Queue
 from typing import Any, Optional
 from pathlib import Path
 
@@ -33,7 +33,7 @@ def create_voiding_result_hook() -> IOResultHook:
             outline = input_object.read(10)
         result_queue.put(outlines)
 
-    return IOResultHook(hook_function)
+    return IOResultHook(hook_function,sink=True)
 
 def stream_prepend_hook(stream:StringIOStream):
     def hook_function(
