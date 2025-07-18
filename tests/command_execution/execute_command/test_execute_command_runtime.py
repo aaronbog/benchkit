@@ -7,9 +7,8 @@ import time
 import tracemalloc
 import unittest
 
-from test_execute_command_function import eprint, print_open_fds
 from benchkit.shell.command_execution.execute import execute_command
-from tests.command_execution.execute_command.util import TestTimeout, generate_test_hook_lists, get_arguments_dict_list, script_path_string, timeout
+from tests.command_execution.execute_command.util import TestTimeout, eprint, generate_test_hook_lists, get_arguments_dict_list, print_open_fds, script_path_string, timeout
 
 tracemalloc.start()
 

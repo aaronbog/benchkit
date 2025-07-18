@@ -2,13 +2,32 @@
 # SPDX-License-Identifier: MIT
 
 import itertools
+import os
 import pathlib
 import signal
+import threading
+import sys
+from time import sleep
 from typing import Any, Dict, List, Optional, Tuple
 
 from benchkit.shell.command_execution.io.stream import ReadableIOStream, WritableIOStream
 from benchkit.shell.command_execution.io.hooks.basic_hooks import create_stream_line_logger_hook, create_voiding_result_hook, logger_line_hook, void_hook, void_input
 from benchkit.shell.command_execution.io.hooks.hook import IOHook, IOResultHook, IOWriterHook, OutputHook
+
+
+def eprint(s:Any) -> None:
+    print(s,file=sys.stderr)
+
+def get_fds_count() -> int:
+    fds = os.listdir('/proc/self/fd/')
+    return len(fds)
+
+def print_open_fds(to_err:bool=True) -> None:
+    string = f'amount of open file descriptors: {get_fds_count()}'
+    if to_err:
+        eprint(string)
+    else:
+        print(string)
 
 
 class TestTimeout(Exception):
@@ -32,6 +51,39 @@ class timeout:
     def __exit__(self, exc_type, exc_val, exc_tb):
         signal.alarm(0)
 
+class FdLeak(Exception):
+    pass
+
+class fd_checker:
+    def __init__(self,tolerance:int=6) -> None:
+        self.tolerance = tolerance
+        self.fd_count:int = 0
+
+    def __enter__(self):
+        self.fd_count = get_fds_count()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type:
+            return
+        if abs(self.fd_count - get_fds_count()) > self.tolerance:
+            raise FdLeak("This with statement ended up with more file descriptorst than when it started")
+
+class ThreadLeak(Exception):
+    pass
+
+class thread_checker:
+    def __init__(self,tolerance:int=6) -> None:
+        self.tolerance = tolerance
+        self.thread_count:int = 0
+
+    def __enter__(self):
+        self.thread_count = threading.active_count()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type:
+            return
+        if abs(self.thread_count - threading.active_count()) > self.tolerance:
+            raise ThreadLeak("This with statement ended up with more threads than when it started")
 
 def script_path_string(script_name: str):
     folder = pathlib.Path(__file__).parent.resolve()
